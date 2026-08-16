@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Маршрут — Travel Visualizer</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <script>
+    window.ROUTE_CONFIG = __ROUTE_CONFIG__;
+  </script>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="map-overlay" id="overlay">
+    <a class="back btn-link" href="/">← Назад</a>
+    <h2 id="r-title">Маршрут</h2>
+    <div class="legend" id="legend"></div>
+    <div class="info-rows" id="info-rows"></div>
+    <div class="progress"><div class="bar" id="progress-bar"></div></div>
+    <div class="controls">
+      <button id="btn-play">⏸ Пауза</button>
+      <button id="btn-restart" class="secondary">↺ Заново</button>
+    </div>
+    <p class="small muted" id="progress-label" style="margin-top:8px"></p>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="/js/map.js"></script>
+</body>
+</html>
