@@ -136,3 +136,79 @@ tr:last-child td { border-bottom: none; }
 .controls button { flex: 1; padding: 8px; font-size: 13px; }
 .progress { height: 4px; background: var(--panel-2); border-radius: 2px; margin-top: 12px; overflow: hidden; }
 .progress .bar { height: 100%; width: 0%; background: var(--accent); }
+
+/* --- v2: cinematic visuals ------------------------------------------- */
+.legend .item .emoji { font-size: 14px; }
+
+/* moving transport marker */
+.travel-marker { position: relative; width: 0; height: 0; }
+.travel-marker-icon {
+  position: absolute; left: -22px; top: -26px;
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  font-size: 30px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.55));
+  transition: transform .08s linear;
+  transform-origin: center;
+}
+.travel-marker-shadow {
+  position: absolute; left: -8px; top: -4px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(0,0,0,.35); filter: blur(4px);
+}
+
+/* start / finish endpoint markers */
+.endpoint { display: flex; flex-direction: column; align-items: center; transform: translateY(-6px); }
+.endpoint-flag { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+.endpoint-flag.start { background: #22c55e; }
+.endpoint-flag.finish { background: #ef4444; }
+.endpoint-label {
+  margin-top: 3px; padding: 2px 7px; border-radius: 6px;
+  background: rgba(15,18,22,.85); color: #fff; font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+
+/* transient segment card (fades) */
+.segment-card {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: rgba(23,28,34,.95); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 16px; font-size: 14px;
+  color: var(--text); z-index: 40; box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  transition: opacity .5s ease; backdrop-filter: blur(6px);
+}
+.segment-card.hidden { opacity: 0; pointer-events: none; }
+
+/* popup rows */
+.popup-row { color: #374151; font-size: 12px; }
+.maplibregl-popup-content { border-radius: 8px; font-size: 13px; padding: 8px 12px; }
+
+/* options grid in overlay + modal */
+.opt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.opt { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.opt select, .opt input[type="number"], .opt input[type="text"], .opt input[type="range"] {
+  padding: 7px 9px; font-size: 13px; background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: 7px; color: var(--text);
+}
+.opt input[type="range"] { padding: 0; }
+.opt.check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
+.opt.check input { width: auto; }
+
+/* export modal */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  width: 560px; max-width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.modal-head h3 { margin: 0; font-size: 16px; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 8px; }
+.modal-body { padding: 18px; }
+.export-progress { margin-top: 14px; }
+.export-progress .progress { margin-top: 6px; }
+.modal-body .controls { margin-top: 16px; }
+.modal .opt-grid { margin-top: 0; }
+.modal-body .btn { width: 100%; }

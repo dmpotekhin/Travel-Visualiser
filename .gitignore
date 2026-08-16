@@ -15,3 +15,4 @@ data/maps/*.html
 
 # OS
 .DS_Store
+.idea/

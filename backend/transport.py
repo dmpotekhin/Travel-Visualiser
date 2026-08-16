@@ -17,6 +17,17 @@ TRANSPORTS: dict[str, dict] = {
 
 DEFAULT_TRANSPORT = "car"
 
+# transport key -> emoji marker icon (used by the frontend map marker)
+EMOJI: dict[str, str] = {
+    "air": "✈️",
+    "rail": "🚂",
+    "car": "🚗",
+    "bus": "🚌",
+    "ferry": "⛴️",
+    "bike": "🚲",
+    "foot": "🚶",
+}
+
 # keyword -> transport key (lowercased). Order matters: more specific first.
 _KEYWORDS: list[tuple[str, str]] = [
     ("авиа", "air"), ("самолёт", "air"), ("самолет", "air"), ("перелёт", "air"),
@@ -124,3 +135,7 @@ def color(transport: str) -> str:
 
 def name(transport: str) -> str:
     return TRANSPORTS.get(transport, TRANSPORTS[DEFAULT_TRANSPORT])["name"]
+
+
+def emoji(transport: str) -> str:
+    return EMOJI.get(transport, EMOJI[DEFAULT_TRANSPORT])

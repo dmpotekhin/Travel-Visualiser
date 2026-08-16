@@ -21,6 +21,8 @@ def build_geojson(segments: list[dict]) -> dict:
                     "to": seg["to"],
                     "transport": seg["transport"],
                     "transport_name": transport_mod.name(seg["transport"]),
+                    "emoji": transport_mod.emoji(seg["transport"]),
+                    "icon_key": seg["transport"],
                     "distance_km": round(seg["distance_km"], 1),
                     "duration_min": round(seg["duration_min"], 1),
                     "color": transport_mod.color(seg["transport"]),

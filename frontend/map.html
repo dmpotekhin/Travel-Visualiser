@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Маршрут — Travel Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
   <link rel="stylesheet" href="/css/style.css">
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
   <script>
@@ -18,15 +19,127 @@
     <h2 id="r-title">Маршрут</h2>
     <div class="legend" id="legend"></div>
     <div class="info-rows" id="info-rows"></div>
-    <div class="progress"><div class="bar" id="progress-bar"></div></div>
+
     <div class="controls">
       <button id="btn-play">⏸ Пауза</button>
       <button id="btn-restart" class="secondary">↺ Заново</button>
     </div>
-    <p class="small muted" id="progress-label" style="margin-top:8px"></p>
+
+    <div class="progress"><div class="bar" id="progress-bar"></div></div>
+    <p class="small muted" id="progress-label" style="margin:8px 0 0"></p>
+
+    <div class="opt-grid">
+      <label class="opt">
+        <span>Стиль карты</span>
+        <select id="style-select"></select>
+      </label>
+      <label class="opt">
+        <span>Скорость <b id="speed-val">1.0×</b></span>
+        <input type="range" id="speed" min="0.25" max="8" step="0.25" value="1">
+      </label>
+      <label class="opt check">
+        <input type="checkbox" id="follow" checked> Камера за точкой
+      </label>
+      <label class="opt check">
+        <input type="checkbox" id="sound" checked> Звук
+      </label>
+    </div>
+
+    <div class="controls">
+      <button id="btn-export" class="secondary">🎬 Экспорт в видео</button>
+    </div>
+  </div>
+
+  <!-- Export modal -->
+  <div class="modal-backdrop hidden" id="export-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>🎬 Экспорт анимации</h3>
+        <button class="modal-close" id="export-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="opt-grid">
+          <label class="opt">
+            <span>Формат</span>
+            <select id="exp-format">
+              <option value="webm">WebM (VP9/VP8)</option>
+              <option value="mp4">MP4 (H.264)</option>
+              <option value="gif">GIF</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Разрешение</span>
+            <select id="exp-res">
+              <option value="640x360">SD · 640×360</option>
+              <option value="1280x720" selected>HD · 1280×720</option>
+              <option value="1920x1080">Full HD · 1920×1080</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>FPS</span>
+            <select id="exp-fps">
+              <option value="15">15</option>
+              <option value="30" selected>30</option>
+              <option value="60">60</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Скорость</span>
+            <select id="exp-speed">
+              <option value="0.5">0.5× (медленно)</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Битрейт, кбит/с</span>
+            <input type="number" id="exp-bitrate" value="8000" min="500" step="500">
+          </label>
+          <label class="opt">
+            <span>Водяной знак (текст)</span>
+            <input type="text" id="exp-watermark" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Позиция знака</span>
+            <select id="exp-wm-pos">
+              <option value="none">Без знака</option>
+              <option value="bottom-right">Справа внизу</option>
+              <option value="bottom-left">Слева внизу</option>
+              <option value="top-right">Справа вверху</option>
+              <option value="top-left">Слева вверху</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Титры в начале</span>
+            <input type="text" id="exp-intro" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Титры в конце</span>
+            <input type="text" id="exp-outro" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Фоновая музыка (mp3/wav/ogg)</span>
+            <input type="file" id="exp-audio" accept="audio/*">
+          </label>
+        </div>
+
+        <div class="export-progress hidden" id="export-progress">
+          <div class="progress"><div class="bar" id="export-bar"></div></div>
+          <p class="small muted" id="export-status"></p>
+        </div>
+
+        <div class="controls">
+          <button id="export-start">⏺ Начать запись</button>
+          <button id="export-cancel" class="secondary">Отмена</button>
+        </div>
+        <a id="export-download" class="btn hidden" download style="margin-top:12px;text-align:center">⬇ Скачать файл</a>
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="/js/map.js"></script>
+  <script src="/js/export.js"></script>
 </body>
 </html>
