@@ -15,6 +15,7 @@ from backend.routing.base import (
 )
 from backend.routing.factory import build_provider_chain, get_provider_for
 from backend.routing.fallback import GreatCircleRoutingProvider
+from backend.routing.graphhopper import GraphHopperRoutingProvider
 from backend.routing.here import HereRoutingProvider
 from backend.routing.osrm import OsrmRoutingProvider
 from backend.transport import TransportType, coerce_transport
@@ -368,3 +369,97 @@ def test_route_segment_falls_here_to_osrm():
     assert seg["provider"] == "OSRM"
     assert seg["distance_km"] == pytest.approx(634.0)
     assert "HERE" in seg["provider_fallback"][0]
+
+
+# --- GraphHopper provider --------------------------------------------------
+
+def test_graphhopper_provider_parses_route_response():
+    def fake_get(url, params=None, timeout=None):
+        assert "graphhopper.com" in url
+        assert params["key"] == "gh-key"
+        assert params["profile"] == "car"
+        return _FakeResp(
+            {
+                "paths": [
+                    {
+                        "distance": 634000,
+                        "time": 25_200_000,
+                        "points": {
+                            "type": "LineString",
+                            "coordinates": [
+                                [55.7558, 37.6173],
+                                [55.7569, 37.6185],
+                                [55.76, 37.63],
+                            ],
+                        },
+                    }
+                ]
+            }
+        )
+
+    p = GraphHopperRoutingProvider("gh-key", http_get=fake_get)
+    res = p.route(MOSCOW, SPB, "car")
+    assert res.provider == "GRAPHHOPPER"
+    assert res.distance_km == pytest.approx(634.0)
+    assert res.duration_min == pytest.approx(420.0)
+    # GeoJSON order: [lon, lat]
+    assert res.geometry[0] == pytest.approx([37.6173, 55.7558])
+    assert res.geometry[-1] == pytest.approx([37.63, 55.76])
+
+
+def test_graphhopper_provider_profile_mapping():
+    seen = []
+
+    def fake_get(url, params=None, timeout=None):
+        seen.append(params["profile"])
+        return _FakeResp({"paths": [{"distance": 1000, "time": 60_000, "points": {"coordinates": []}}]})
+
+    p = GraphHopperRoutingProvider("gh-key", http_get=fake_get)
+    p.route(MOSCOW, SPB, "car")
+    p.route(MOSCOW, SPB, "bike")
+    p.route(MOSCOW, SPB, "foot")
+    assert seen == ["car", "bike", "foot"]
+
+
+def test_graphhopper_provider_unsupported_transport_raises():
+    p = GraphHopperRoutingProvider("gh-key", http_get=lambda *a, **k: _FakeResp({}))
+    assert not p.supports("air")
+    assert not p.supports("rail")
+    with pytest.raises(UnsupportedTransportError):
+        p.route(MOSCOW, SPB, "rail")
+
+
+def test_graphhopper_provider_raises_on_error():
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp({"message": "Unauthorized"}, status=401)
+
+    p = GraphHopperRoutingProvider("gh-key", http_get=fake_get)
+    with pytest.raises(ProviderUnavailableError):
+        p.route(MOSCOW, SPB, "car")
+
+
+def test_build_provider_chain_with_graphhopper(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "")
+    monkeypatch.setattr(config, "OSRM_BASE_URL", "")
+    monkeypatch.setattr(config, "GRAPHHOPPER_API_KEY", "gh-key")
+    chain = build_provider_chain()
+    assert [p.name for p in chain] == ["GRAPHHOPPER", "GREAT_CIRCLE"]
+
+
+def test_route_segment_falls_through_osrm_to_graphhopper():
+    def down(url, params=None, timeout=None):
+        raise RuntimeError("down")
+
+    def gh_get(url, params=None, timeout=None):
+        return _FakeResp({"paths": [{"distance": 634000, "time": 25_200_000, "points": {"coordinates": []}}]})
+
+    chain = [
+        HereRoutingProvider("test-key", http_get=down),
+        OsrmRoutingProvider("http://localhost:5000", http_get=down),
+        GraphHopperRoutingProvider("gh-key", http_get=gh_get),
+        GreatCircleRoutingProvider(),
+    ]
+    seg = route_segment(MOSCOW, SPB, "car", chain=chain)
+    assert seg["provider"] == "GRAPHHOPPER"
+    assert seg["distance_km"] == pytest.approx(634.0)
+    assert len(seg["provider_fallback"]) == 2
