@@ -22,7 +22,7 @@ from .base import (
     UnsupportedTransportError,
 )
 from .fallback import GreatCircleRoutingProvider
-from .factory import build_provider_chain, get_provider_for, route_segment
+from .factory import build_provider_chain, describe_providers, get_provider_for, route_segment
 
 __all__ = [
     "GreatCircleRoutingProvider",
@@ -34,6 +34,7 @@ __all__ = [
     "RoutingProvider",
     "UnsupportedTransportError",
     "build_provider_chain",
+    "describe_providers",
     "get_provider_for",
     "route_segment",
 ]

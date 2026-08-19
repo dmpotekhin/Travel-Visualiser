@@ -26,6 +26,7 @@ def build_geojson(segments: list[dict]) -> dict:
                     "distance_km": round(seg["distance_km"], 1),
                     "duration_min": round(seg["duration_min"], 1),
                     "color": transport_mod.color(seg["transport"]),
+                    "provider": seg.get("provider", "unknown"),
                 },
             }
         )

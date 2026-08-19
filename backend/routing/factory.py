@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from .. import config
+from .. import config, transport as transport_mod
 from .base import (
     ProviderConfigurationError,
     ProviderUnavailableError,
@@ -95,6 +95,42 @@ def build_provider_chain(cfg=None) -> list[RoutingProvider]:
     if not chain:  # strict mode with nothing configured -> still usable
         chain.append(GreatCircleRoutingProvider())
     return chain
+
+
+def describe_providers(cfg=None) -> list[dict]:
+    """Diagnostic view of every known provider (configured? in chain? transports?)."""
+    cfg = cfg or config
+    chain = build_provider_chain(cfg)
+    chain_names = {p.name for p in chain}
+    out = []
+    for name in _resolve_order(cfg):
+        if name == "GREAT_CIRCLE":
+            provider = GreatCircleRoutingProvider()
+        elif _provider_available(name, cfg):
+            provider = _make_provider(name, cfg)
+        else:
+            out.append(
+                {
+                    "name": name,
+                    "configured": False,
+                    "in_chain": False,
+                    "priority": None,
+                    "transports": [],
+                }
+            )
+            continue
+        out.append(
+            {
+                "name": name,
+                "configured": True,
+                "in_chain": name in chain_names,
+                "priority": provider.priority,
+                "transports": sorted(
+                    t for t in transport_mod.TRANSPORTS if provider.supports(t)
+                ),
+            }
+        )
+    return out
 
 
 def get_provider_for(transport: str, chain=None) -> RoutingProvider:

@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, database
-from .routers import animate, stats, studio, upload
+from .routers import animate, routes, stats, studio, upload
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ app.include_router(animate.router)
 app.include_router(upload.router)
 app.include_router(stats.router)
 app.include_router(studio.router)
+app.include_router(routes.router)
 
 
 @app.get("/health")

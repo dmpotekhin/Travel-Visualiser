@@ -54,6 +54,27 @@ def _summarize(segments: list[dict]) -> dict:
     }
 
 
+def _coord_label(coord) -> str:
+    """Human-readable label for a bare (lat, lon) coordinate."""
+    return f"{coord[0]:.3f}, {coord[1]:.3f}"
+
+
+def route_legs(legs: list[dict]) -> dict:
+    """Route arbitrary legs by coordinates (no persistence, no geocoding).
+
+    Each leg: {"from": (lat, lon), "to": (lat, lon), "transport": key,
+               "from_name": str | None, "to_name": str | None}.
+    Used by POST /api/routes so the frontend never talks to a provider.
+    """
+    segments = []
+    for leg in legs:
+        seg = routing.route_segment(leg["from"], leg["to"], leg["transport"])
+        seg["from"] = leg.get("from_name") or _coord_label(leg["from"])
+        seg["to"] = leg.get("to_name") or _coord_label(leg["to"])
+        segments.append(_enrich_segment(seg))
+    return _summarize(segments)
+
+
 def preview_route(route_text: str) -> dict:
     """Process a route string WITHOUT persisting (for the wizard preview)."""
     segments = _build_segments(route_text)
