@@ -8,12 +8,15 @@ from backend import transport as transport_mod
 from backend.routing import route_segment
 from backend.routing.base import (
     ProviderConfigurationError,
+    ProviderNoRouteError,
     ProviderUnavailableError,
     RoutingProvider,
+    UnsupportedTransportError,
 )
 from backend.routing.factory import build_provider_chain, get_provider_for
 from backend.routing.fallback import GreatCircleRoutingProvider
 from backend.routing.here import HereRoutingProvider
+from backend.routing.osrm import OsrmRoutingProvider
 from backend.transport import TransportType, coerce_transport
 
 
@@ -275,3 +278,93 @@ def test_route_segment_raises_when_all_providers_fail():
     chain = [HereRoutingProvider("test-key", http_get=fake_get)]
     with pytest.raises(ProviderUnavailableError):
         route_segment(MOSCOW, SPB, "car", chain=chain)
+
+
+# --- OSRM provider ---------------------------------------------------------
+
+OSRM_POLYLINE = "wxhsIccrdF{EoFkR{fA"  # [[37.6173,55.7558],[37.6185,55.7569],[37.63,55.76]]
+
+
+def test_osrm_provider_parses_route_response():
+    def fake_get(url, params=None, timeout=None):
+        assert "/driving/" in url
+        assert params["geometries"] == "polyline"
+        return _FakeResp(
+            {
+                "code": "Ok",
+                "routes": [
+                    {
+                        "distance": 634000,
+                        "duration": 25200,
+                        "geometry": OSRM_POLYLINE,
+                    }
+                ],
+            }
+        )
+
+    p = OsrmRoutingProvider("http://localhost:5000", http_get=fake_get)
+    res = p.route(MOSCOW, SPB, "car")
+    assert res.provider == "OSRM"
+    assert res.distance_km == pytest.approx(634.0)
+    assert res.duration_min == pytest.approx(420.0)
+    assert res.geometry[0] == pytest.approx([37.6173, 55.7558])
+    assert res.geometry[-1] == pytest.approx([37.63, 55.76])
+
+
+def test_osrm_provider_profile_mapping():
+    seen = []
+
+    def fake_get(url, params=None, timeout=None):
+        seen.append(url)
+        return _FakeResp({"code": "Ok", "routes": [{"distance": 1000, "duration": 60, "geometry": ""}]})
+
+    p = OsrmRoutingProvider("http://localhost:5000", http_get=fake_get)
+    p.route(MOSCOW, SPB, "car")
+    p.route(MOSCOW, SPB, "bike")
+    p.route(MOSCOW, SPB, "foot")
+    assert "/driving/" in seen[0]
+    assert "/cycling/" in seen[1]
+    assert "/walking/" in seen[2]
+
+
+def test_osrm_provider_unsupported_transport_raises():
+    p = OsrmRoutingProvider("http://localhost:5000", http_get=lambda *a, **k: _FakeResp({}))
+    assert not p.supports("air")
+    assert not p.supports("rail")
+    with pytest.raises(UnsupportedTransportError):
+        p.route(MOSCOW, SPB, "air")
+
+
+def test_osrm_provider_no_route_raises():
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp({"code": "NoRoute", "message": "Impossible route"})
+
+    p = OsrmRoutingProvider("http://localhost:5000", http_get=fake_get)
+    with pytest.raises(ProviderNoRouteError):
+        p.route(MOSCOW, SPB, "car")
+
+
+def test_build_provider_chain_with_osrm(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "")
+    monkeypatch.setattr(config, "OSRM_BASE_URL", "http://localhost:5000")
+    monkeypatch.setattr(config, "GRAPHHOPPER_API_KEY", "")
+    chain = build_provider_chain()
+    assert [p.name for p in chain] == ["OSRM", "GREAT_CIRCLE"]
+
+
+def test_route_segment_falls_here_to_osrm():
+    def here_get(url, params=None, timeout=None):
+        raise RuntimeError("down")
+
+    def osrm_get(url, params=None, timeout=None):
+        return _FakeResp({"code": "Ok", "routes": [{"distance": 634000, "duration": 25200, "geometry": ""}]})
+
+    chain = [
+        HereRoutingProvider("test-key", http_get=here_get),
+        OsrmRoutingProvider("http://localhost:5000", http_get=osrm_get),
+        GreatCircleRoutingProvider(),
+    ]
+    seg = route_segment(MOSCOW, SPB, "car", chain=chain)
+    assert seg["provider"] == "OSRM"
+    assert seg["distance_km"] == pytest.approx(634.0)
+    assert "HERE" in seg["provider_fallback"][0]
