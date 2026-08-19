@@ -72,6 +72,8 @@ def _deepseek_parse(text: str) -> str:
             ],
             "temperature": 0,
             "stream": False,
+            "max_tokens": config.LLM_MAX_TOKENS,
+            **config.LLM_EXTRA_JSON,
         },
         headers={"Authorization": f"Bearer {config.DEEPSEEK_API_KEY}"},
         timeout=30.0,

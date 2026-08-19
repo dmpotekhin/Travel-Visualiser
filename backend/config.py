@@ -1,6 +1,7 @@
 """Central configuration loaded from environment / .env."""
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -28,10 +29,23 @@ GRAPHHOPPER_BASE_URL = os.getenv(
 ).strip()
 ROUTING_TIMEOUT_S = float(os.getenv("ROUTING_TIMEOUT_S", "15"))
 
-# --- DeepSeek (optional, for natural-language route parsing) ---
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+# --- LLM (optional, for natural-language route parsing) ---
+# OpenAI-compatible endpoint: DeepSeek by default, or any compatible provider
+# (e.g. HuggingFace Inference: https://router.huggingface.co/v1/chat/completions).
+LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("DEEPSEEK_API_KEY", "")).strip()
+LLM_MODEL = os.getenv("LLM_MODEL", os.getenv("DEEPSEEK_MODEL", "deepseek-chat")).strip()
+LLM_URL = os.getenv(
+    "LLM_URL", os.getenv("DEEPSEEK_URL", "https://api.deepseek.com/chat/completions")
+).strip()
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1024"))
+# Optional extra JSON body merged into the chat/completions payload, e.g.
+# Qwen on HF: {"chat_template_kwargs":{"enable_thinking":false}}
+_extra = os.getenv("LLM_EXTRA_JSON", "").strip()
+LLM_EXTRA_JSON = json.loads(_extra) if _extra else {}
+# Legacy aliases so existing .env / tests keep working
+DEEPSEEK_API_KEY = LLM_API_KEY
+DEEPSEEK_MODEL = LLM_MODEL
+DEEPSEEK_URL = LLM_URL
 
 # --- CesiumJS Ion token (optional, for 3D terrain/imagery) ---
 CESIUM_ION_TOKEN = os.getenv("CESIUM_ION_TOKEN", "").strip()
