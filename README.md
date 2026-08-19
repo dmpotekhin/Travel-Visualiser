@@ -101,26 +101,39 @@ python main.py
 
 Требования: Python 3.11+ (на macOS и Linux работает из коробки).
 
-## Конфигурация — HERE API (опционально)
+## Конфигурация — провайдеры маршрутов (опционально)
 
 По умолчанию приложение полностью работоспособно: геокодирование через
-Nominatim, расстояния — по дуге большого круга (Гаверсин). Чтобы получать
-реальные дорожные и железнодорожные расстояния и геометрию, добавьте бесплатный
-ключ HERE:
+Nominatim, расстояния — по дуге большого круга (Гаверсин). Расчёт маршрутов —
+**заменяемый сервис**: фронтенд и пайплайн не знают, какой провайдер отработал,
+каждый сегмент получает метку `provider`.
+
+Цепочка (порядок настраивается): **HERE → OSRM → GraphHopper → great-circle
+(всегда доступен)**. Первый провайдер, поддерживающий тип транспорта и
+отвечающий успешно, отдаёт маршрут; остальные логируются в
+`provider_fallback`.
 
 ```bash
 cp .env.example .env
 # отредактируйте .env:
-#   HERE_API_KEY=ваш_ключ
+#   HERE_API_KEY=ваш_ключ            # HERE Routing/Matrix v8
+#   OSRM_BASE_URL=https://router.project-osrm.org   # или self-hosted
+#   GRAPHHOPPER_API_KEY=ваш_ключ     # https://graphhopper.com/
+#   GRAPHHOPPER_BASE_URL=https://graphhopper.com/api/1
+#   ROUTING_PROVIDER_ORDER=auto      # "auto" = HERE,OSRM,GRAPHHOPPER,GREAT_CIRCLE
+#   ROUTING_FALLBACK_ENABLED=true    # false = strict mode (ошибка вместо фолбэка)
 ```
 
-Ключ бесплатного тарифа — на [developer.here.com](https://developer.here.com/).
-Ключ **не зашивается** в код: он живёт только в `.env` (файл в `.gitignore`).
-
-Дополнительные (все опциональны):
+Ключи **не зашиваются** в код: они живут только в `.env` (файл в `.gitignore`).
 
 | Переменная | Назначение |
 |---|---|
+| `HERE_API_KEY` | HERE Routing v8 + Matrix v8 (авто/автобус/вело/пешком/паром) |
+| `OSRM_BASE_URL` | OSRM-сервер (driving/cycling/walking), публичный или свой |
+| `GRAPHHOPPER_API_KEY` | GraphHopper cloud API (car/bike/foot) |
+| `GRAPHHOPPER_BASE_URL` | базовый URL GraphHopper (по умолчанию `https://graphhopper.com/api/1`) |
+| `ROUTING_PROVIDER_ORDER` | порядок провайдеров: `auto` или CSV, напр. `OSRM,GRAPHHOPPER` |
+| `ROUTING_FALLBACK_ENABLED` | `true` — при недоступности всех провайдеров считать по Гаверсину; `false` — строгий режим, ошибка |
 | `DEEPSEEK_API_KEY` | AI-парсинг описаний маршрута (иначе — эвристический парсер). Ключ на [platform.deepseek.com](https://platform.deepseek.com/) |
 | `DEEPSEEK_MODEL` | модель DeepSeek (по умолчанию `deepseek-chat`) |
 | `CESIUM_ION_TOKEN` | реальный 3D-рельеф и премиум-подложки глобуса (иначе — плоский эллипсоид + бесплатные слои). Токен на [ion.cesium.com](https://ion.cesium.com/) |
@@ -205,6 +218,8 @@ Liberty, Positron, Dark Matter (бесплатные векторные стил
 | `POST` | `/api/parse` | разбор ввода `{kind: text\|nl\|gmaps, input}` → превью маршрута |
 | `POST` | `/api/parse-file` | разбор GPX/KML/KMZ/GeoJSON (multipart) → превью маршрута |
 | `POST` | `/api/geocode` | геокодирование одного названия → `{name, coord}` |
+| `POST` | `/api/routes` | расчёт сегментов по координатам без сохранения: `{"segments":[{"from":{"lat","lon","name"?},"to":{...},"transport":"CAR"|"train"|...}]}` → маршрут с GeoJSON (провайдер-агностик) |
+| `GET` | `/api/providers` | диагностика: порядок цепочки, `fallback_enabled`, какие провайдеры настроены и какие транспорты поддерживают |
 
 ## Типы транспорта
 
@@ -220,24 +235,27 @@ Liberty, Positron, Dark Matter (бесплатные векторные стил
 
 ## Как это работает
 
+```mermaid
+flowchart TD
+    A["маршрут: 'СПб – Москва – Пекин'"] --> B["разбиение на сегменты"]
+    B --> C["геокодирование: кэш → HERE → Nominatim"]
+    C --> D["Routing Service<br/>(backend/routing)"]
+    D --> D1["HERE Routing v8<br/>+ Matrix v8 фолбэк"]
+    D --> D2["OSRM<br/>driving / cycling / walking"]
+    D --> D3["GraphHopper<br/>car / bike / foot"]
+    D --> D4["great-circle<br/>(Гаверсин, всегда доступен)"]
+    D1 --> E["GeoJSON FeatureCollection<br/>+ provider на каждом сегменте"]
+    D2 --> E
+    D3 --> E
+    D4 --> E
+    E --> F["MapLibre: цвет + узор по транспорту,<br/>анимация маркера"]
+    E --> G["SQLite → аналитика и история"]
 ```
-маршрут ("СПб – Москва – Пекин")
-        │  разбиение на сегменты (город → город)
-        ▼
-геокодирование городов:  кэш → HERE → Nominatim
-        │
-        ▼
-каждый сегмент: геометрия + расстояние + время
-   ├─ воздух        → дуга большого круга (авиалиний в открытом доступе нет)
-   ├─ наземный + HERE → реальные дороги/ЖД (HERE Routing v8), фолбэк Matrix API
-   └─ без ключа     → Гаверсин + дуга большого круга
-        │
-        ▼
-GeoJSON FeatureCollection (транспорт, цвет, км, время)
-        │
-        ▼
-сохранение в SQLite (data/travel.db)  →  аналитика и история
-```
+
+Каждый сегмент получает поля `provider` (кто считал) и, при фолбэке,
+`provider_fallback` (причины отказов предыдущих провайдеров). Карта рисует
+узоры: авто/автобус/паром — почти сплошная, поезд — пунктир, пешком — точки,
+велосипед — штрих-пунктир, самолёт — длинные штрихи поверх дуги большого круга.
 
 ## Структура проекта
 
