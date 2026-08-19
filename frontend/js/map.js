@@ -140,12 +140,14 @@
       legend.appendChild(item);
     }
 
+    const providers = [...new Set(route.segments.map((s) => s.provider).filter(Boolean))];
     const rows = [
       ['Всего', Math.round(totalKm).toLocaleString('ru-RU') + ' км'],
       ['Экваторов', (totalKm / EQUATOR).toFixed(2) + '×'],
       ['До Луны', (totalKm / MOON * 100).toFixed(2) + '% пути'],
       ['Сегментов', String(route.segments.length)],
       ['Время в пути', formatDuration(route.total_duration_min)],
+      ['Провайдеры', providers.length ? providers.join(', ') : '—'],
     ];
     const info = $('info-rows');
     info.innerHTML = '';
@@ -334,15 +336,31 @@
       map.addLayer({ id: 'route-gradient', type: 'line', source: 'route-gradient',
         layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: gradientPaint() });
 
-      // per-segment transport tint
+      // per-segment transport tint + transport-specific dash pattern
+      // car/bus/ferry -> solid-ish, rail -> dash, foot -> dots,
+      // bike -> dash-dot, air -> long strokes (great-circle arc is already the geometry)
       map.addLayer({ id: 'route-transport', type: 'line', source: 'route', filter: ['==', '$type', 'LineString'],
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': ['get', 'color'], 'line-width': 1.6, 'line-opacity': 0.55 } });
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 1.6,
+          'line-opacity': 0.55,
+          'line-dasharray': ['match', ['get', 'transport'],
+            'rail', [5, 2.5],
+            'foot', [1, 1.8],
+            'bike', [4, 2, 1, 2],
+            'air', [7, 2.5],
+            [3, 0.6]],
+        } });
 
-      // static dashed texture + moving firefly
+      // static white dashes on top: only for surface transport (car/bus/ferry)
       map.addLayer({ id: 'route-dashes', type: 'line', source: 'route', filter: ['==', '$type', 'LineString'],
         layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.28, 'line-dasharray': [1.5, 2.5] } });
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 4,
+          'line-opacity': ['match', ['get', 'transport'], ['rail', 'foot', 'bike', 'air'], 0, 0.28],
+          'line-dasharray': [1.5, 2.5] } });
       map.addLayer({ id: 'route-pulse', type: 'line', source: 'route-gradient',
         layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: pulsePaint(0) });
 
@@ -434,7 +452,8 @@
         const s = route.segments[si];
         setMarkerIcon(s);
         showSegmentCard(s.emoji + ' ' + s.transport_name + ' · ' + s.from + ' → ' + s.to +
-          ' · ' + Math.round(s.distance_km).toLocaleString('ru-RU') + ' км');
+          ' · ' + Math.round(s.distance_km).toLocaleString('ru-RU') + ' км' +
+          (s.provider ? ' · ' + s.provider : ''));
         if (state.playing) tone(660, 0.12, 'sine', 0.05);
       }
 
