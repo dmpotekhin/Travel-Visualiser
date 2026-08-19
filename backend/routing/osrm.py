@@ -89,8 +89,11 @@ class OsrmRoutingProvider(RoutingProvider):
             f"{self._base_url}/{profile}/{fr_lon},{fr_lat};{to_lon},{to_lat}"
         )
         params = {"overview": "full", "geometries": "polyline"}
-        resp = self._get(url, params=params, timeout=self._timeout)
-        resp.raise_for_status()
+        try:
+            resp = self._get(url, params=params, timeout=self._timeout)
+            resp.raise_for_status()
+        except Exception as exc:
+            raise ProviderUnavailableError(f"OSRM недоступен: {exc}") from exc
         data = resp.json()
         code = data.get("code")
         if code != "Ok":

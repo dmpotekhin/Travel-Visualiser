@@ -62,10 +62,15 @@ class GraphHopperRoutingProvider(RoutingProvider):
             "point": [f"{fr_lat},{fr_lon}", f"{to_lat},{to_lon}"],
             "points_encoded": "false",
         }
-        resp = self._get(
-            f"{self._base_url}/route", params=params, timeout=self._timeout
-        )
-        resp.raise_for_status()
+        try:
+            resp = self._get(
+                f"{self._base_url}/route", params=params, timeout=self._timeout
+            )
+            resp.raise_for_status()
+        except Exception as exc:
+            raise ProviderUnavailableError(
+                f"GraphHopper недоступен: {exc}"
+            ) from exc
         data = resp.json()
         paths = data.get("paths") or []
         if not paths:
