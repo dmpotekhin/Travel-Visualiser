@@ -35,26 +35,26 @@ def _decode_polyline(polyline: str, precision: int = 5) -> list[list[float]]:
     index = 0
     length = len(polyline)
     while index < length:
-        result = 1
+        result = 0
         shift = 0
         while True:
             b = ord(polyline[index]) - 63
             index += 1
-            result += (b & 0x1F) << shift
+            result |= (b & 0x1F) << shift
             shift += 5
             if b < 0x20:
                 break
-        lat += (~result >> 1) if (result & 1) else (result >> 1)
-        result = 1
+        lat += ~(result >> 1) if (result & 1) else (result >> 1)
+        result = 0
         shift = 0
         while True:
             b = ord(polyline[index]) - 63
             index += 1
-            result += (b & 0x1F) << shift
+            result |= (b & 0x1F) << shift
             shift += 5
             if b < 0x20:
                 break
-        lng += (~result >> 1) if (result & 1) else (result >> 1)
+        lng += ~(result >> 1) if (result & 1) else (result >> 1)
         coords.append([lng / factor, lat / factor])
     return coords
 
