@@ -12,6 +12,14 @@ load_dotenv(BASE_DIR / ".env")
 # --- HERE API (optional) ---
 HERE_API_KEY = os.getenv("HERE_API_KEY", "").strip()
 
+# --- DeepSeek (optional, for natural-language route parsing) ---
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
+DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+
+# --- CesiumJS Ion token (optional, for 3D terrain/imagery) ---
+CESIUM_ION_TOKEN = os.getenv("CESIUM_ION_TOKEN", "").strip()
+
 # --- Paths ---
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "travel.db"

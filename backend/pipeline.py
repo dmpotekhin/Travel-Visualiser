@@ -5,6 +5,7 @@ import json
 from typing import Optional
 
 from . import database, geocoding, geojson as geojson_mod, routing, transport as transport_mod
+from . import track as track_mod
 
 
 def _enrich_segment(seg: dict) -> dict:
@@ -15,7 +16,8 @@ def _enrich_segment(seg: dict) -> dict:
     return seg
 
 
-def _build_route(route_text: str, year: Optional[int], note: Optional[str]) -> dict:
+def _build_segments(route_text: str) -> list[dict]:
+    """Parse a route string into enriched segments (geocode + route each leg)."""
     spec = transport_mod.parse_route(route_text)
     segments = []
     for s in spec:
@@ -25,7 +27,52 @@ def _build_route(route_text: str, year: Optional[int], note: Optional[str]) -> d
         seg["from"] = s["from"]
         seg["to"] = s["to"]
         segments.append(_enrich_segment(seg))
+    return segments
 
+
+def _points_from_segments(segments: list[dict]) -> list[dict]:
+    """Derive an ordered list of stops (name + coord) from segments."""
+    pts: list[dict] = []
+    for i, s in enumerate(segments):
+        if not s["geometry"]:
+            continue
+        if i == 0:
+            pts.append({"name": s["from"], "coord": s["geometry"][0]})
+        pts.append({"name": s["to"], "coord": s["geometry"][-1]})
+    return pts
+
+
+def _summarize(segments: list[dict]) -> dict:
+    total_km = round(sum(s["distance_km"] for s in segments), 2)
+    total_dur = round(sum(s["duration_min"] for s in segments), 1)
+    return {
+        "segments": segments,
+        "points": _points_from_segments(segments),
+        "total_distance_km": total_km,
+        "total_duration_min": total_dur,
+        "geojson": geojson_mod.build_geojson(segments),
+    }
+
+
+def preview_route(route_text: str) -> dict:
+    """Process a route string WITHOUT persisting (for the wizard preview)."""
+    segments = _build_segments(route_text)
+    out = _summarize(segments)
+    out["route_text"] = route_text
+    return out
+
+
+def preview_track(coords: list[list[float]], route_text: Optional[str] = None) -> dict:
+    """Build a preview from raw waypoints (GPX/KML/GeoJSON/Google-Maps coords)."""
+    segments = track_mod.coords_to_segments(coords, transport="auto")
+    segments = [_enrich_segment(s) for s in segments]
+    out = _summarize(segments)
+    out["route_text"] = route_text or "Трек"
+    return out
+
+
+def process_route(route_text: str, year: Optional[int] = None, note: Optional[str] = None) -> dict:
+    segments = _build_segments(route_text)
     total_km = sum(s["distance_km"] for s in segments)
     total_dur = sum(s["duration_min"] for s in segments)
     gj = geojson_mod.build_geojson(segments)
@@ -40,14 +87,11 @@ def _build_route(route_text: str, year: Optional[int], note: Optional[str]) -> d
         "year": year,
         "note": note,
         "segments": segments,
+        "points": _points_from_segments(segments),
         "total_distance_km": round(total_km, 2),
         "total_duration_min": round(total_dur, 1),
         "geojson": gj,
     }
-
-
-def process_route(route_text: str, year: Optional[int] = None, note: Optional[str] = None) -> dict:
-    return _build_route(route_text, year, note)
 
 
 def route_from_db(route_id: int) -> Optional[dict]:
@@ -64,6 +108,7 @@ def route_from_db(route_id: int) -> Optional[dict]:
         "year": row["year"],
         "note": row["note"],
         "segments": segments,
+        "points": _points_from_segments(segments),
         "total_distance_km": round(total_km, 2),
         "total_duration_min": round(total_dur, 1),
         "geojson": geojson_mod.build_geojson(segments),

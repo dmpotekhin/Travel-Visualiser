@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Студия — Travel Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/studio.css">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/cesium@1.117.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script>
+    window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.117.0/Build/Cesium/';
+  </script>
+</head>
+<body>
+  <div id="map-2d"></div>
+  <div id="globe-3d" class="hidden"></div>
+
+  <div class="studio-overlay" id="overlay">
+    <a class="back btn-link" href="/wizard">← Конструктор</a>
+    <h2 id="r-title">Маршрут</h2>
+
+    <div class="mode-toggle">
+      <button id="btn-mode-2d" class="mode active">2D</button>
+      <button id="btn-mode-3d" class="mode">3D</button>
+    </div>
+
+    <div class="controls">
+      <button id="btn-play">⏸ Пауза</button>
+      <button id="btn-restart" class="secondary">↺ Заново</button>
+    </div>
+
+    <div class="progress"><div class="bar" id="progress-bar"></div></div>
+    <p class="small muted" id="progress-label" style="margin:8px 0 0"></p>
+
+    <div class="opt-grid">
+      <label class="opt">
+        <span>Стиль 2D</span>
+        <select id="style-2d"></select>
+      </label>
+      <label class="opt">
+        <span>Скорость <b id="speed-val">1.0×</b></span>
+        <input type="range" id="speed" min="0.25" max="8" step="0.25" value="1">
+      </label>
+      <label class="opt check">
+        <input type="checkbox" id="follow" checked> Камера за точкой
+      </label>
+    </div>
+
+    <div class="controls">
+      <button id="btn-export" class="secondary">🎬 Экспорт в видео</button>
+    </div>
+  </div>
+
+  <!-- Photo popup (appears when the marker reaches a point) -->
+  <div class="photo-popup hidden" id="photo-popup">
+    <button class="photo-close" id="photo-close">✕</button>
+    <div class="photo-title" id="photo-title"></div>
+    <div class="photo-desc" id="photo-desc"></div>
+    <div class="photo-strip" id="photo-strip"></div>
+  </div>
+
+  <!-- Export modal -->
+  <div class="modal-backdrop hidden" id="export-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>🎬 Экспорт анимации</h3>
+        <button class="modal-close" id="export-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="opt-grid">
+          <label class="opt">
+            <span>Соотношение сторон</span>
+            <select id="exp-aspect">
+              <option value="16:9" selected>16:9 — YouTube</option>
+              <option value="9:16">9:16 — Reels / TikTok</option>
+              <option value="1:1">1:1 — блог</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Качество</span>
+            <select id="exp-quality">
+              <option value="720p">HD · 720p</option>
+              <option value="1080p" selected>Full HD · 1080p</option>
+              <option value="2160p">4K · 2160p</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Формат</span>
+            <select id="exp-format">
+              <option value="webm">WebM (VP9/VP8)</option>
+              <option value="mp4">MP4 (H.264)</option>
+              <option value="gif">GIF</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>FPS</span>
+            <select id="exp-fps">
+              <option value="15">15</option>
+              <option value="30" selected>30</option>
+              <option value="60">60</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Водяной знак (текст)</span>
+            <input type="text" id="exp-watermark" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Позиция знака</span>
+            <select id="exp-wm-pos">
+              <option value="bottom-right" selected>Справа внизу</option>
+              <option value="bottom-left">Слева внизу</option>
+              <option value="top-right">Справа вверху</option>
+              <option value="top-left">Слева вверху</option>
+            </select>
+          </label>
+          <label class="opt">
+            <span>Титры в начале</span>
+            <input type="text" id="exp-intro" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Титры в конце</span>
+            <input type="text" id="exp-outro" placeholder="необязательно">
+          </label>
+          <label class="opt">
+            <span>Фоновая музыка (mp3/wav/ogg)</span>
+            <input type="file" id="exp-audio" accept="audio/*">
+          </label>
+        </div>
+
+        <p class="help muted" id="export-tier-note"></p>
+
+        <div class="export-progress hidden" id="export-progress">
+          <div class="progress"><div class="bar" id="export-bar"></div></div>
+          <p class="small muted" id="export-status"></p>
+        </div>
+
+        <div class="controls">
+          <button id="export-start">⏺ Начать запись</button>
+          <button id="export-cancel" class="secondary">Отмена</button>
+        </div>
+        <a id="export-download" class="btn hidden" download style="margin-top:12px;text-align:center">⬇ Скачать файл</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.117.0/Build/Cesium/Cesium.js"></script>
+  <script src="/js/geo-utils.js"></script>
+  <script src="/js/studio.js"></script>
+  <script src="/js/studio-export.js"></script>
+</body>
+</html>

@@ -552,6 +552,18 @@
       update,
       setSpeed: (v) => { state.speedFactor = v; $('speed').value = v; $('speed-val').textContent = v + '×'; },
       getMap: () => map,
+      // DOM marker accessors — the vehicle icon is an HTML overlay, so the
+      // export module must re-draw it onto the composite canvas itself.
+      getMarkerLngLat: () => marker.getLngLat(),
+      getMarkerEmoji: () => {
+        const el = markerEl.querySelector('.travel-marker-icon');
+        return el ? el.textContent : '🚗';
+      },
+      getMarkerRotation: () => {
+        const el = markerEl.querySelector('.travel-marker-icon');
+        const m = el && (el.style.transform || '').match(/rotate\((-?[\d.]+)deg\)/);
+        return m ? parseFloat(m[1]) : 0;
+      },
     };
   }
 

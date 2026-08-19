@@ -10,8 +10,10 @@
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11%2B-blue">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.115-009688">
   <img alt="MapLibre GL JS" src="https://img.shields.io/badge/MapLibre%20GL%20JS-4.7-7c3aed">
+  <img alt="CesiumJS" src="https://img.shields.io/badge/CesiumJS-1.117-00bfff">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-3-003b57">
   <img alt="HERE API" src="https://img.shields.io/badge/HERE%20API-optional-00afaa">
+  <img alt="DeepSeek" src="https://img.shields.io/badge/DeepSeek-optional-8b5cf6">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-green">
 </p>
 
@@ -50,6 +52,35 @@
 - **Работает без ключей** — HERE API опционален; без него используется
   Nominatim + формула Гаверсина.
 
+## 🎬 Конструктор видео и гибридная студия (2D/3D)
+
+Новый пошаговый **мастер** (`/wizard`) превращает маршрут в готовый ролик для
+соцсетей — в духе mult.dev, без переписывания старого функционала:
+
+1. **Ввод маршрута** — четыре способа: строка городов, файл **GPX/KML/KMZ/
+   GeoJSON**, ссылка **Google Maps** (с координатами) и **текстовое описание**
+   на естественном языке (парсится DeepSeek, если задан ключ, иначе —
+   детерминированный эвристический парсер).
+2. **Транспорт** — на каждом участке (самолёт ✈️ / поезд 🚂 / авто 🚗 / автобус 🚌
+   / паром ⛴️ / велосипед 🚲 / пешком 🚶); по умолчанию подбирается по расстоянию.
+3. **Фото и описания** — до 5 фото на точку (сжимаются в браузере) + текст;
+   появляются поверх карты при достижении точки.
+4. **Стиль** — 5 пресетов 2D (MapLibre) с живым превью + 3 пресета 3D-глобуса
+   (CesiumJS, бесплатные слои OSM/Carto/Esri — токен не нужен).
+5. **Видео** — соотношение сторон (9:16 / 16:9 / 1:1), качество (720p/1080p/4K),
+   длительность, водяной знак, титры, фоновая музыка; **4 готовых шаблона**.
+6. **Экспорт** — открывается **студия** (`/studio`) с гибридным 2D↔3D
+   переключением без потери позиции анимации и записью WebM/MP4/GIF.
+
+**Гибридная студия:** один общий стейт (`state.frac`) и один цикл
+`requestAnimationFrame` управляют и MapLibre, и CesiumJS — при переключении
+2D/3D в любой момент вы видите актуальную позицию. CesiumJS грузится с CDN,
+иконка транспорта — билборд на глобусе, камера следует за маркером.
+
+**Тарифы (заглушка):** Free — до 3 экспортов в месяц + водяной знак приложения;
+Pro — без лимитов и без знака. Кнопка Upgrade пока заглушка (Stripe/ЮKassa не
+подключены).
+
 ## Быстрый старт
 
 ```bash
@@ -85,6 +116,14 @@ cp .env.example .env
 
 Ключ бесплатного тарифа — на [developer.here.com](https://developer.here.com/).
 Ключ **не зашивается** в код: он живёт только в `.env` (файл в `.gitignore`).
+
+Дополнительные (все опциональны):
+
+| Переменная | Назначение |
+|---|---|
+| `DEEPSEEK_API_KEY` | AI-парсинг описаний маршрута (иначе — эвристический парсер). Ключ на [platform.deepseek.com](https://platform.deepseek.com/) |
+| `DEEPSEEK_MODEL` | модель DeepSeek (по умолчанию `deepseek-chat`) |
+| `CESIUM_ION_TOKEN` | реальный 3D-рельеф и премиум-подложки глобуса (иначе — плоский эллипсоид + бесплатные слои). Токен на [ion.cesium.com](https://ion.cesium.com/) |
 
 ## Использование
 
@@ -160,6 +199,12 @@ Liberty, Positron, Dark Matter (бесплатные векторные стил
 | `GET` | `/map/{id}` | HTML-карта сохранённого маршрута |
 | `GET` | `/api/geojson/{id}` | маршрут с GeoJSON |
 | `GET` | `/health` | статус и наличие HERE-ключа |
+| `GET` | `/wizard` | страница конструктора видео |
+| `GET` | `/studio` | страница гибридной студии (2D/3D) |
+| `GET` | `/api/config` | публичная конфигурация (Cesium-токен, наличие ключей) |
+| `POST` | `/api/parse` | разбор ввода `{kind: text\|nl\|gmaps, input}` → превью маршрута |
+| `POST` | `/api/parse-file` | разбор GPX/KML/KMZ/GeoJSON (multipart) → превью маршрута |
+| `POST` | `/api/geocode` | геокодирование одного названия → `{name, coord}` |
 
 ## Типы транспорта
 
@@ -209,20 +254,27 @@ travel-visualizer/
 │   ├── geocoding.py       # HERE/Nominatim + кэш городов
 │   ├── routing.py         # HERE Routing/Matrix + фолбэк
 │   ├── here_polyline.py   # декодер HERE flexible-polyline
+│   ├── track.py           # парсинг GPX/KML/KMZ/GeoJSON + ссылок Google Maps
+│   ├── ai.py              # парсинг описаний (DeepSeek или эвристика)
 │   ├── parsing.py         # парсинг CSV/Excel
 │   ├── analytics.py       # агрегаты и статистика
 │   ├── database.py        # SQLite (stdlib sqlite3)
-│   ├── pipeline.py        # оркестрация обработки маршрута
+│   ├── pipeline.py        # оркестрация обработки маршрута (+ preview_* без записи)
 │   ├── views.py           # рендер HTML-страницы карты
-│   └── routers/           # animate / upload / stats+history+map
+│   └── routers/           # animate / upload / stats+history+map / studio
 ├── frontend/
 │   ├── index.html         # главная (формы, статистика, аналитика)
-│   ├── map.html           # страница карты (шаблон)
+│   ├── wizard.html        # конструктор видео (мастер, 6 шагов)
+│   ├── studio.html        # гибридная студия 2D/3D + экспорт
+│   ├── map.html           # страница карты (шаблон, legacy)
 │   ├── css/style.css
+│   ├── css/studio.css     # стили мастера и студии
 │   ├── styles/cartoon.json # кастомный мультяшный стиль
 │   ├── vendor/            # mp4-muxer, gif.js (+worker) — локально
-│   └── js/                # app.js (главная), map.js (карта + эффекты),
-│                          # export.js (запись видео/GIF)
+│   └── js/                # app.js (главная), geo-utils.js (общие гео-хелперы),
+│                          # wizard.js (мастер), studio.js (2D/3D синхронная
+│                          # анимация), studio-export.js (запись видео/GIF),
+│                          # map.js + export.js (legacy карта/экспорт)
 ├── data/                  # travel.db, sample_routes.csv
 ├── tests/                 # pytest
 └── scripts/start.sh       # запуск одной командой
@@ -236,7 +288,9 @@ python -m pytest -q
 ```
 
 Покрытие: парсинг маршрутов и транспорта, гео-расчёты, декодер HERE
-flexible-polyline, аналитика, парсинг CSV/Excel, и end-to-end по API через
+flexible-polyline, аналитика, парсинг CSV/Excel, парсинг GPX/KML/GeoJSON,
+AI/эвристический парсинг описаний, студийные эндпоинты (`/api/parse`,
+`/api/parse-file`, `/api/geocode`, `/api/config`), и end-to-end по API через
 TestClient.
 
 ## Ограничения
@@ -249,6 +303,13 @@ TestClient.
   городов закэшированы и работают офлайн.
 - История хранится локально в `data/travel.db`; чтобы начать с чистого листа,
   удалите файл.
+- 3D-глобус без `CESIUM_ION_TOKEN` использует плоский эллипсоид (без реального
+  рельефа) и бесплатные подложки OSM/Carto/Esri — этого достаточно для
+  визуализации маршрутов.
+- Короткие ссылки Google Maps (`goo.gl/maps/...`) не парсятся — нужно
+  развернуть их или вставить полную ссылку с координатами / названия городов.
+- Эвристический AI-парсер (без `DEEPSEEK_API_KEY`) не склоняет названия — для
+  точного распознавания «из СПб в Москву» подключите ключ DeepSeek.
 
 ## Лицензия
 

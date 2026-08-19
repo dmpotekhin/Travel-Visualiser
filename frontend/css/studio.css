@@ -1,0 +1,110 @@
+/* ==========================================================================
+   Studio (wizard + hybrid 2D/3D) styles — additive to style.css
+   ========================================================================== */
+
+/* ---- studio page -------------------------------------------------------- */
+#map-2d, #globe-3d { position: fixed; inset: 0; }
+#globe-3d { background: #000; }
+
+.studio-overlay {
+  position: fixed; top: 16px; left: 16px;
+  width: 320px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px); overflow-y: auto;
+  background: rgba(23, 28, 34, 0.94);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; z-index: 10; backdrop-filter: blur(6px);
+}
+.studio-overlay h2 { margin: 6px 0; border: none; }
+.studio-overlay .back { display: inline-block; margin-bottom: 8px; }
+
+.mode-toggle { display: flex; gap: 6px; margin: 10px 0; }
+.mode-toggle .mode {
+  flex: 1; padding: 8px; font-size: 13px; font-weight: 600;
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted); cursor: pointer;
+}
+.mode-toggle .mode.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* photo popup (appears when the marker reaches a point) */
+.photo-popup {
+  position: fixed; right: 20px; bottom: 20px; z-index: 30;
+  width: 300px; max-width: calc(100vw - 40px);
+  background: rgba(23, 28, 34, 0.95); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+}
+.photo-close { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+.photo-title { font-weight: 700; font-size: 16px; margin-bottom: 4px; padding-right: 20px; }
+.photo-desc { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.photo-strip { display: flex; gap: 6px; flex-wrap: wrap; }
+.popup-photo { width: 82px; height: 82px; object-fit: cover; border-radius: 8px; }
+
+/* ---- wizard ------------------------------------------------------------- */
+.wizard-wrap { max-width: 900px; }
+.wizard-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.tier-badge {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
+  font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+
+.steps { list-style: none; display: flex; gap: 6px; padding: 0; margin: 18px 0; flex-wrap: wrap; }
+.steps li {
+  padding: 7px 13px; border-radius: 20px; font-size: 13px; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--border); cursor: default;
+}
+.steps li.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+
+.wizard-nav { display: flex; justify-content: space-between; margin-top: 8px; }
+.wizard-nav button { min-width: 140px; }
+.wizard-nav .primary { font-size: 15px; }
+
+/* input tabs */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.tab {
+  padding: 8px 14px; font-size: 13px; border-radius: 8px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+}
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+.tab-pane textarea { width: 100%; padding: 11px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 15px; font-family: inherit; }
+
+/* points list */
+.points-list { display: flex; flex-direction: column; gap: 6px; }
+.point-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; }
+.point-name { flex: 1; font-weight: 600; }
+.icon-btn { padding: 4px 9px; font-size: 13px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.icon-btn.danger { color: #fca5a5; border-color: var(--danger); }
+
+/* transport list */
+.transport-list { display: flex; flex-direction: column; gap: 8px; }
+.transport-row { display: flex; align-items: center; gap: 12px; }
+.transport-row .seg { flex: 1; font-weight: 600; }
+.transport-row select { width: 170px; flex: none; }
+
+/* photo cards */
+.photo-list { display: flex; flex-direction: column; gap: 12px; }
+.photo-card { padding: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; }
+.photo-title { font-weight: 700; margin-bottom: 8px; }
+.photo-card textarea { width: 100%; margin-top: 8px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 13px; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+
+/* style preview */
+.style-preview { height: 180px; margin-top: 12px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+
+/* templates */
+.templates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.template { padding: 12px; font-size: 14px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text); }
+.template:hover { border-color: var(--accent); }
+
+/* review */
+.review p { margin: 6px 0; font-size: 14px; }
+
+@media (max-width: 700px) {
+  .templates, .grid-2 { grid-template-columns: 1fr; }
+}

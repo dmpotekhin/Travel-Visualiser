@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Конструктор видео — Travel Visualizer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/studio.css">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container wizard-wrap">
+    <div class="wizard-head">
+      <div>
+        <a class="back btn-link" href="/">← На главную</a>
+        <h1>🎬 Конструктор видео маршрута</h1>
+        <p class="subtitle">Введите маршрут, настройте стиль и параметры — и получите анимированный ролик для соцсетей.</p>
+      </div>
+      <div class="tier-badge" id="tier-badge" title="Тариф">
+        <span id="tier-label">Free</span>
+        <button class="btn-link" id="tier-upgrade">Upgrade</button>
+      </div>
+    </div>
+
+    <ol class="steps" id="steps">
+      <li data-step="1" class="active">1 · Маршрут</li>
+      <li data-step="2">2 · Транспорт</li>
+      <li data-step="3">3 · Фото</li>
+      <li data-step="4">4 · Стиль</li>
+      <li data-step="5">5 · Видео</li>
+      <li data-step="6">6 · Готово</li>
+    </ol>
+
+    <!-- STEP 1: route input -->
+    <section class="step-panel active" data-step="1">
+      <div class="card">
+        <div class="tabs" id="input-tabs">
+          <button class="tab active" data-mode="text">Текст</button>
+          <button class="tab" data-mode="file">Файл (GPX/KML/GeoJSON)</button>
+          <button class="tab" data-mode="gmaps">Google Maps</button>
+          <button class="tab" data-mode="nl">Описание (AI)</button>
+        </div>
+
+        <div class="tab-pane active" data-pane="text">
+          <label for="in-text">Города через дефис или запятую</label>
+          <input type="text" id="in-text" value="Санкт-Петербург – Москва – Пекин"
+                 placeholder="Санкт-Петербург – Москва – Пекин">
+        </div>
+
+        <div class="tab-pane" data-pane="file">
+          <label for="in-file">GPX, KML, KMZ или GeoJSON</label>
+          <input type="file" id="in-file" accept=".gpx,.kml,.kmz,.geojson,.json">
+        </div>
+
+        <div class="tab-pane" data-pane="gmaps">
+          <label for="in-gmaps">Ссылка Google Maps (с координатами)</label>
+          <input type="url" id="in-gmaps" placeholder="https://www.google.com/maps/dir/...">
+        </div>
+
+        <div class="tab-pane" data-pane="nl">
+          <label for="in-nl">Опишите маршрут своими словами</label>
+          <textarea id="in-nl" rows="3" placeholder="Хочу поехать из СПб в Москву, потом в Пекин на поезде"></textarea>
+          <p class="help" id="nl-help"></p>
+        </div>
+
+        <div class="controls" style="margin-top:12px">
+          <button id="btn-parse" class="primary">🔍 Распознать маршрут</button>
+        </div>
+        <p class="help" id="parse-status"></p>
+      </div>
+
+      <div class="card hidden" id="points-card">
+        <h3 style="margin-top:0">Точки маршрута <span class="muted small" id="points-count"></span></h3>
+        <div id="points-list" class="points-list"></div>
+        <div class="controls" style="margin-top:8px">
+          <button id="btn-add-point" class="secondary">＋ Добавить точку</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: transport -->
+    <section class="step-panel" data-step="2">
+      <div class="card">
+        <h3 style="margin-top:0">Транспорт на каждом участке</h3>
+        <p class="help">Выбор влияет на иконку маркера, скорость и цвет линии во время анимации.</p>
+        <div id="transport-list" class="transport-list"></div>
+      </div>
+    </section>
+
+    <!-- STEP 3: photos + descriptions -->
+    <section class="step-panel" data-step="3">
+      <div class="card">
+        <h3 style="margin-top:0">Фото и описания к точкам</h3>
+        <p class="help">До 5 фото на точку. Они появятся поверх карты, когда маркер достигнет точки.</p>
+        <div id="photo-list" class="photo-list"></div>
+      </div>
+    </section>
+
+    <!-- STEP 4: style -->
+    <section class="step-panel" data-step="4">
+      <div class="grid grid-2">
+        <div class="card">
+          <h3 style="margin-top:0">2D-карта (MapLibre)</h3>
+          <label class="opt"><span>Стиль</span>
+            <select id="style-2d"></select>
+          </label>
+          <div id="style-preview" class="style-preview"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">3D-глобус (CesiumJS)</h3>
+          <label class="opt"><span>Стиль</span>
+            <select id="style-3d"></select>
+          </label>
+          <p class="help">Глобус использует бесплатные слои (OSM / Carto / Esri) — токен не нужен. Реальный рельеф — опционально через CESIUM_ION_TOKEN.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 5: video settings -->
+    <section class="step-panel" data-step="5">
+      <div class="card">
+        <h3 style="margin-top:0">Шаблон</h3>
+        <div class="templates" id="templates"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Настройки видео</h3>
+        <div class="opt-grid">
+          <label class="opt"><span>Соотношение сторон</span>
+            <select id="v-aspect">
+              <option value="16:9" selected>16:9 — YouTube</option>
+              <option value="9:16">9:16 — Reels / TikTok</option>
+              <option value="1:1">1:1 — блог</option>
+            </select>
+          </label>
+          <label class="opt"><span>Качество</span>
+            <select id="v-quality">
+              <option value="720p">HD · 720p</option>
+              <option value="1080p" selected>Full HD · 1080p</option>
+              <option value="2160p">4K · 2160p</option>
+            </select>
+          </label>
+          <label class="opt"><span>Длительность <b id="v-duration-val">30 с</b></span>
+            <input type="range" id="v-duration" min="10" max="90" step="5" value="30">
+          </label>
+          <label class="opt"><span>Водяной знак (текст)</span>
+            <input type="text" id="v-watermark" placeholder="необязательно">
+          </label>
+          <label class="opt"><span>Позиция знака</span>
+            <select id="v-wm-pos">
+              <option value="bottom-right" selected>Справа внизу</option>
+              <option value="bottom-left">Слева внизу</option>
+              <option value="top-right">Справа вверху</option>
+              <option value="top-left">Слева вверху</option>
+            </select>
+          </label>
+          <label class="opt"><span>Титры в начале</span>
+            <input type="text" id="v-intro" placeholder="необязательно">
+          </label>
+          <label class="opt"><span>Титры в конце</span>
+            <input type="text" id="v-outro" placeholder="необязательно">
+          </label>
+          <label class="opt"><span>Фоновая музыка (mp3/wav/ogg)</span>
+            <input type="file" id="v-music" accept="audio/*">
+          </label>
+        </div>
+        <p class="help" id="tier-note"></p>
+      </div>
+    </section>
+
+    <!-- STEP 6: review -->
+    <section class="step-panel" data-step="6">
+      <div class="card">
+        <h3 style="margin-top:0">Проверьте проект</h3>
+        <div id="review" class="review"></div>
+      </div>
+      <div class="controls">
+        <button id="btn-open-studio" class="primary">🎬 Открыть в студии</button>
+      </div>
+    </section>
+
+    <div class="wizard-nav">
+      <button id="btn-back" class="secondary hidden">← Назад</button>
+      <button id="btn-next" class="primary">Далее →</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="/js/geo-utils.js"></script>
+  <script src="/js/wizard.js"></script>
+</body>
+</html>
