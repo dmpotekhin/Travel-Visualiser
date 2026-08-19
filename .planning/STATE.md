@@ -4,11 +4,11 @@
 
 ## Current Position
 
-- **Milestone:** M3 — Video constructor (wizard + hybrid 2D/3D + export settings)
-- **Phase:** P3 — Studio (wizard + CesiumJS + aspect-ratio export)
-- **Status:** verify
-- **Current task:** docs + final verification done (59 tests, browser smoke green)
-- **Last updated:** 2026-08-17
+- **Milestone:** M4 — Routing & Map Enhancement (provider abstraction)
+- **Phase:** P1 — Plan (routing providers: HERE/OSRM/GraphHopper + fallback)
+- **Status:** plan
+- **Current task:** PLAN.md written; awaiting OK before implementation
+- **Last updated:** 2026-08-19
 
 ## Active Decisions
 

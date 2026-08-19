@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from enum import Enum
 from typing import Optional
 
 # key -> (name_ru, name_en, avg_speed_kmh, color_hex)
@@ -16,6 +17,59 @@ TRANSPORTS: dict[str, dict] = {
 }
 
 DEFAULT_TRANSPORT = "car"
+
+
+class TransportType(str, Enum):
+    """Canonical transport types.
+
+    Values ARE the internal lowercase keys used in storage and GeoJSON,
+    so existing data stays compatible. New code should reference the enum
+    members; legacy code can keep using the raw keys.
+    """
+
+    CAR = "car"
+    TRAIN = "rail"
+    PLANE = "air"
+    WALK = "foot"
+    BICYCLE = "bike"
+    BUS = "bus"
+    FERRY = "ferry"
+
+
+# uppercase / English aliases accepted by coerce_transport()
+_TRANSPORT_ALIASES: dict[str, str] = {
+    "CAR": "car", "AUTO": "car", "DRIVING": "car", "DRIVE": "car", "TAXI": "car",
+    "TRAIN": "rail", "RAIL": "rail", "RAILWAY": "rail",
+    "PLANE": "air", "AIR": "air", "FLIGHT": "air", "FLY": "air",
+    "WALK": "foot", "WALKING": "foot", "FOOT": "foot", "PEDESTRIAN": "foot",
+    "BICYCLE": "bike", "BIKE": "bike", "CYCLING": "bike",
+    "BUS": "bus", "COACH": "bus",
+    "FERRY": "ferry", "SHIP": "ferry", "BOAT": "ferry",
+}
+
+
+def coerce_transport(value) -> str:
+    """Normalize any user-supplied transport value to a canonical key.
+
+    Accepts TransportType members, existing internal keys (car, rail, ...)
+    and uppercase/English aliases (CAR, TRAIN, PLANE, WALK, BICYCLE, ...).
+
+    Raises ValueError for unknown or empty values.
+    """
+    if isinstance(value, TransportType):
+        return value.value
+    if value is None:
+        raise ValueError("Тип транспорта не указан")
+    s = str(value).strip()
+    if not s:
+        raise ValueError("Тип транспорта не указан")
+    low = s.lower()
+    if low in TRANSPORTS:
+        return low
+    key = _TRANSPORT_ALIASES.get(s.upper())
+    if key:
+        return key
+    raise ValueError(f"Неизвестный тип транспорта: {value}")
 
 # transport key -> emoji marker icon (used by the frontend map marker)
 EMOJI: dict[str, str] = {
