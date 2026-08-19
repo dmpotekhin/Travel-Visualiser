@@ -2,20 +2,16 @@
 
 Public API (backward compatible with the old backend/routing.py):
 
-    route_segment(fr, to, transport) -> dict
-        one segment: geometry + distance + duration + provider info
-    route_segments(segments) -> list[RouteResult]
-        batch helper over explicit segment specs
-    get_provider_for(transport) -> RoutingProvider
-        provider selection by transport type
+    route_segment(fr, to, transport, chain=None) -> dict
+        one segment: geometry + distance + duration + provider annotation
+    get_provider_for(transport, chain=None) -> RoutingProvider
+        transport-aware provider selection
     build_provider_chain() -> list[RoutingProvider]
-        ordered provider chain from configuration
+        ordered chain per ROUTING_PROVIDER_ORDER / ROUTING_FALLBACK_ENABLED
 
-Providers live in here.py, osrm.py, graphhopper.py and fallback.py;
-the chain itself is assembled in factory.py.
+Providers live in routing/here.py, routing/osrm.py, routing/graphhopper.py
+and routing/fallback.py; the chain is assembled in routing/factory.py.
 """
-from __future__ import annotations
-
 from .base import (
     ProviderConfigurationError,
     ProviderNoRouteError,
@@ -26,13 +22,18 @@ from .base import (
     UnsupportedTransportError,
 )
 from .fallback import GreatCircleRoutingProvider
+from .factory import build_provider_chain, get_provider_for, route_segment
 
-
-def route_segment(fr, to, transport):
-    """Backward-compatible single-segment routing.
-
-    For now: great-circle model (no external providers yet). The provider
-    chain (HERE -> OSRM -> GraphHopper -> great-circle) is wired up in
-    factory.py during the next milestone phase.
-    """
-    return GreatCircleRoutingProvider().route(fr, to, transport).to_dict()
+__all__ = [
+    "GreatCircleRoutingProvider",
+    "ProviderConfigurationError",
+    "ProviderNoRouteError",
+    "ProviderUnavailableError",
+    "RouteResult",
+    "RoutingError",
+    "RoutingProvider",
+    "UnsupportedTransportError",
+    "build_provider_chain",
+    "get_provider_for",
+    "route_segment",
+]

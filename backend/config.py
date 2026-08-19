@@ -12,6 +12,22 @@ load_dotenv(BASE_DIR / ".env")
 # --- HERE API (optional) ---
 HERE_API_KEY = os.getenv("HERE_API_KEY", "").strip()
 
+# --- Routing providers (HERE / OSRM / GraphHopper) ---
+# Comma-separated provider priority: "auto" = HERE,OSRM,GRAPHHOPPER,GREAT_CIRCLE
+ROUTING_PROVIDER_ORDER = os.getenv("ROUTING_PROVIDER_ORDER", "auto").strip()
+# When true (default), a failed external provider silently falls through to
+# the next one and finally to the deterministic great-circle model. When
+# false, provider errors propagate to the caller (strict mode).
+ROUTING_FALLBACK_ENABLED = os.getenv("ROUTING_FALLBACK_ENABLED", "true").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "").strip()
+GRAPHHOPPER_API_KEY = os.getenv("GRAPHHOPPER_API_KEY", "").strip()
+GRAPHHOPPER_BASE_URL = os.getenv(
+    "GRAPHHOPPER_BASE_URL", "https://graphhopper.com/api/1"
+).strip()
+ROUTING_TIMEOUT_S = float(os.getenv("ROUTING_TIMEOUT_S", "15"))
+
 # --- DeepSeek (optional, for natural-language route parsing) ---
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()

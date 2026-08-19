@@ -3,8 +3,17 @@ from __future__ import annotations
 
 import pytest
 
-from backend import geo
+from backend import config, geo
 from backend import transport as transport_mod
+from backend.routing import route_segment
+from backend.routing.base import (
+    ProviderConfigurationError,
+    ProviderUnavailableError,
+    RoutingProvider,
+)
+from backend.routing.factory import build_provider_chain, get_provider_for
+from backend.routing.fallback import GreatCircleRoutingProvider
+from backend.routing.here import HereRoutingProvider
 from backend.transport import TransportType, coerce_transport
 
 
@@ -77,15 +86,192 @@ def test_great_circle_supports_all_transports():
 
 def test_route_segment_without_provider_uses_great_circle(monkeypatch):
     # no HERE key -> deterministic great-circle result, provider annotated
-    monkeypatch.setattr("backend.config.HERE_API_KEY", "")
-    from backend import routing
-
+    monkeypatch.setattr(config, "HERE_API_KEY", "")
     moscow = (55.7558, 37.6173)
     spb = (59.9343, 30.3351)
-    seg = routing.route_segment(moscow, spb, "car")
+    seg = route_segment(moscow, spb, "car")
 
     assert seg["provider"] == "GREAT_CIRCLE"
     assert seg["transport"] == "car"
     assert seg["distance_km"] == pytest.approx(geo.haversine_km(*moscow, *spb), rel=1e-3)
     assert seg["duration_min"] >= 1.0
     assert len(seg["geometry"]) > 2
+
+
+# --- HERE provider --------------------------------------------------------
+
+# "BF45p0KkkzlH8GwHsT8nC" decodes to:
+#   [[37.6173, 55.7558], [37.6185, 55.7569], [37.63, 55.76]]
+# (generated with an independent encoder, see /tmp/enc_polyline.py)
+HERE_POLYLINE = "BF45p0KkkzlH8GwHsT8nC"
+MOSCOW = (55.7558, 37.6173)
+SPB = (59.9343, 30.3351)
+
+
+class _FakeResp:
+    def __init__(self, payload, status=200):
+        self._payload = payload
+        self.status_code = status
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+    def json(self):
+        return self._payload
+
+
+def test_here_provider_parses_route_response():
+    calls = []
+
+    def fake_get(url, params=None, timeout=None):
+        calls.append(url)
+        assert params["apiKey"] == "test-key"
+        assert params["transportMode"] == "car"
+        return _FakeResp(
+            {
+                "routes": [
+                    {
+                        "sections": [
+                            {
+                                "summary": {"length": 634000, "duration": 25200},
+                                "polyline": HERE_POLYLINE,
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+
+    provider = HereRoutingProvider("test-key", http_get=fake_get)
+    res = provider.route(MOSCOW, SPB, "car")
+
+    assert res.provider == "HERE"
+    assert res.distance_km == pytest.approx(634.0)
+    assert res.duration_min == pytest.approx(420.0)
+    # decoded flexible polyline -> [lon, lat]
+    assert res.geometry[0] == pytest.approx([37.6173, 55.7558])
+    assert res.geometry[-1] == pytest.approx([37.63, 55.76])
+
+
+def test_here_provider_matrix_fallback_on_route_failure():
+    def fake_get(url, params=None, timeout=None):
+        if "matrix" in url:
+            return _FakeResp(
+                {"matrix": [[{"summary": {"length": 700000, "duration": 30000}}]]}
+            )
+        raise RuntimeError("routing down")
+
+    provider = HereRoutingProvider("test-key", http_get=fake_get)
+    res = provider.route(MOSCOW, SPB, "car")
+
+    assert res.provider == "HERE"
+    assert res.distance_km == pytest.approx(700.0)
+    assert res.duration_min == pytest.approx(500.0)
+    assert res.provider_info["distance_source"] == "matrix"
+    # geometry is the great-circle baseline
+    assert res.geometry[0] == pytest.approx([37.6173, 55.7558])
+    assert res.geometry[-1] == pytest.approx([30.3351, 59.9343])
+
+
+def test_here_provider_raises_when_route_and_matrix_fail():
+    def fake_get(url, params=None, timeout=None):
+        raise RuntimeError("network down")
+
+    provider = HereRoutingProvider("test-key", http_get=fake_get)
+    with pytest.raises(ProviderUnavailableError):
+        provider.route(MOSCOW, SPB, "car")
+
+
+def test_here_provider_supports_surface_transport_only():
+    provider = HereRoutingProvider("test-key")
+    for t in ("car", "bus", "bike", "foot", "ferry"):
+        assert provider.supports(t)
+    assert not provider.supports("air")
+    assert not provider.supports("rail")
+
+
+# --- provider chain / factory ---------------------------------------------
+
+
+def test_build_provider_chain_auto_with_here(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "test-key")
+    monkeypatch.setattr(config, "OSRM_BASE_URL", "")
+    monkeypatch.setattr(config, "GRAPHHOPPER_API_KEY", "")
+    chain = build_provider_chain()
+    assert [p.name for p in chain] == ["HERE", "GREAT_CIRCLE"]
+
+
+def test_build_provider_chain_without_here(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "")
+    monkeypatch.setattr(config, "OSRM_BASE_URL", "")
+    monkeypatch.setattr(config, "GRAPHHOPPER_API_KEY", "")
+    chain = build_provider_chain()
+    assert [p.name for p in chain] == ["GREAT_CIRCLE"]
+
+
+def test_build_provider_chain_invalid_order(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "test-key")
+    monkeypatch.setattr(config, "ROUTING_PROVIDER_ORDER", "HERE,BOGUS")
+    with pytest.raises(ProviderConfigurationError):
+        build_provider_chain()
+
+
+def test_get_provider_for_transport(monkeypatch):
+    monkeypatch.setattr(config, "HERE_API_KEY", "test-key")
+    monkeypatch.setattr(config, "OSRM_BASE_URL", "")
+    monkeypatch.setattr(config, "GRAPHHOPPER_API_KEY", "")
+    chain = build_provider_chain()
+    assert get_provider_for("car", chain).name == "HERE"
+    # air/rail are not supported by HERE -> great-circle
+    assert get_provider_for("air", chain).name == "GREAT_CIRCLE"
+    assert get_provider_for("rail", chain).name == "GREAT_CIRCLE"
+
+
+def test_route_segment_uses_here_when_available():
+    def fake_get(url, params=None, timeout=None):
+        return _FakeResp(
+            {
+                "routes": [
+                    {
+                        "sections": [
+                            {
+                                "summary": {"length": 634000, "duration": 25200},
+                                "polyline": HERE_POLYLINE,
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+
+    chain = [
+        HereRoutingProvider("test-key", http_get=fake_get),
+        GreatCircleRoutingProvider(),
+    ]
+    seg = route_segment(MOSCOW, SPB, "car", chain=chain)
+    assert seg["provider"] == "HERE"
+    assert seg["distance_km"] == pytest.approx(634.0)
+
+
+def test_route_segment_falls_back_through_chain():
+    def fake_get(url, params=None, timeout=None):
+        raise RuntimeError("down")
+
+    chain = [
+        HereRoutingProvider("test-key", http_get=fake_get),
+        GreatCircleRoutingProvider(),
+    ]
+    seg = route_segment(MOSCOW, SPB, "car", chain=chain)
+    assert seg["provider"] == "GREAT_CIRCLE"
+    assert seg["provider_fallback"], "fallback reasons must be recorded"
+    assert "HERE" in seg["provider_fallback"][0]
+
+
+def test_route_segment_raises_when_all_providers_fail():
+    def fake_get(url, params=None, timeout=None):
+        raise RuntimeError("down")
+
+    chain = [HereRoutingProvider("test-key", http_get=fake_get)]
+    with pytest.raises(ProviderUnavailableError):
+        route_segment(MOSCOW, SPB, "car", chain=chain)
